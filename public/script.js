@@ -52,7 +52,6 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('chatMessages:', chatMessages ? '✅' : '❌');
     console.log('messageInput:', messageInput ? '✅' : '❌');
     console.log('sendButton:', sendButton ? '✅' : '❌');
-    console.log('typingIndicator:', typingIndicator ? '✅' : '❌');
     
     if (!messageInput || !sendButton) {
         console.error('❌ Critical DOM elements not found!');
@@ -80,6 +79,32 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Focus on input
     messageInput.focus();
+
+    // Đảm bảo luôn có typing-indicator trong DOM
+    let typingIndicator = document.getElementById('typingIndicator');
+    if (!typingIndicator) {
+        typingIndicator = document.createElement('div');
+        typingIndicator.className = 'typing-indicator';
+        typingIndicator.id = 'typingIndicator';
+        typingIndicator.style.display = 'none';
+        typingIndicator.innerHTML = `
+            <div class="message ai-message">
+                <div class="message-avatar">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="message-content">
+                    <div class="typing-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            </div>
+        `;
+        chatMessages.appendChild(typingIndicator);
+    } else {
+        chatMessages.appendChild(typingIndicator);
+    }
     
     // Add responsive handler
     setupResponsiveHandler();
@@ -149,13 +174,62 @@ function setupEventListeners() {
 
     // Socket event listeners
     socket.on('chat response', handleAIResponse);
-    socket.on('typing', handleTyping);
+    socket.on('typing', (typing) => {
+        console.log('📡 Typing:', typing);
+        showTypingIndicator(typing);
+    });
     socket.on('error', handleError);
 }
 
 // Generate unique ID
 function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+// Typing Indicator Functions
+function showTypingIndicator(isTyping) {
+    let indicator = document.getElementById('typingIndicator');
+    if (isTyping) {
+        // Ẩn welcome message
+        const welcomeMessage = document.querySelector('.welcome-message');
+        if (welcomeMessage) {
+            welcomeMessage.style.display = 'none';
+        }
+        // Nếu chưa có indicator thì tạo mới
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.className = 'typing-indicator';
+            indicator.id = 'typingIndicator';
+            indicator.style.display = 'none';
+            indicator.innerHTML = `
+                <div class="message ai-message">
+                    <div class="message-avatar">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="message-content">
+                        <div class="typing-dots">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            chatMessages.appendChild(indicator);
+        } else {
+            chatMessages.appendChild(indicator);
+        }
+        indicator.style.display = 'block';
+        setTimeout(() => {
+            indicator.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }, 100);
+        console.log('✅ Typing indicator shown');
+    } else {
+        if (indicator) {
+            indicator.style.display = 'none';
+            console.log('✅ Typing indicator hidden');
+        }
+    }
 }
 
 // LocalStorage functions for chat history
@@ -349,10 +423,17 @@ async function sendMessage() {
     const messageToSend = message || 'Hãy mô tả ảnh này';
     const imageToSend = currentImageUrl;
     
+    // Disable input và show loading state
+    messageInput.disabled = true;
+    sendButton.disabled = true;
+    messageInput.placeholder = "Đang xử lý...";
+    
+    // Show loading spinner in send button
+    sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    
     // Clear input and image
     messageInput.value = '';
     messageInput.style.height = 'auto';
-    sendButton.disabled = true;
     removeImage();
 
     // Hide welcome message
@@ -391,41 +472,80 @@ async function sendMessage() {
     // Save to localStorage and update sidebar
     saveConversationsToStorage();
     updateChatHistory();
+
+    // Hiển thị indicator ở cuối khi gửi chat
+    showTypingIndicator(true);
+
+    // Đảm bảo indicator nằm dưới tin nhắn mới nhất
+    if (typingIndicator && chatMessages.contains(typingIndicator)) {
+        chatMessages.appendChild(typingIndicator);
+    }
 }
 
 // Create message element (for loading conversations)
 function createMessageElement(content, sender, imageUrl = null) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sender}-message`;
+    messageDiv.className = 'message';
 
-    const avatarDiv = document.createElement('div');
-    avatarDiv.className = 'message-avatar';
-    avatarDiv.innerHTML = sender === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+    if (sender === 'user') {
+        // User message structure
+        const userMessageDiv = document.createElement('div');
+        userMessageDiv.className = 'user-message';
+        
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'message-avatar';
+        avatarDiv.innerHTML = '<i class="fas fa-user"></i>';
 
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    
-    // Add image if present
-    if (imageUrl) {
-        const imageDiv = document.createElement('div');
-        imageDiv.className = 'message-image';
-        imageDiv.innerHTML = `<img src="${imageUrl}" alt="Uploaded image" onclick="openImageModal('${imageUrl}')">`;
-        contentDiv.appendChild(imageDiv);
-    }
-    
-    // Add text content
-    if (content) {
-        const textDiv = document.createElement('div');
-        if (sender === 'ai') {
-            textDiv.innerHTML = formatAIResponse(content);
-        } else {
-            textDiv.textContent = content;
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        // Add image if present
+        if (imageUrl) {
+            const imageDiv = document.createElement('div');
+            imageDiv.className = 'message-image';
+            imageDiv.innerHTML = `<img src="${imageUrl}" alt="Uploaded image" onclick="openImageModal('${imageUrl}')">`;
+            contentDiv.appendChild(imageDiv);
         }
-        contentDiv.appendChild(textDiv);
-    }
+        
+        // Add text content
+        if (content) {
+            const textDiv = document.createElement('div');
+            textDiv.textContent = content;
+            contentDiv.appendChild(textDiv);
+        }
+        
+        userMessageDiv.appendChild(avatarDiv);
+        userMessageDiv.appendChild(contentDiv);
+        messageDiv.appendChild(userMessageDiv);
+    } else {
+        // AI message structure (unchanged)
+        messageDiv.className = `message ${sender}-message`;
+        
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'message-avatar';
+        avatarDiv.innerHTML = '<i class="fas fa-robot"></i>';
 
-    messageDiv.appendChild(avatarDiv);
-    messageDiv.appendChild(contentDiv);
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        // Add image if present
+        if (imageUrl) {
+            const imageDiv = document.createElement('div');
+            imageDiv.className = 'message-image';
+            imageDiv.innerHTML = `<img src="${imageUrl}" alt="Uploaded image" onclick="openImageModal('${imageUrl}')">`;
+            contentDiv.appendChild(imageDiv);
+        }
+        
+        // Add text content
+        if (content) {
+            const textDiv = document.createElement('div');
+            textDiv.innerHTML = formatAIResponse(content);
+            contentDiv.appendChild(textDiv);
+        }
+        
+        messageDiv.appendChild(avatarDiv);
+        messageDiv.appendChild(contentDiv);
+    }
     
     return messageDiv;
 }
@@ -433,36 +553,68 @@ function createMessageElement(content, sender, imageUrl = null) {
 // Add message to chat
 function addMessage(content, sender, imageUrl = null) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sender}-message`;
+    messageDiv.className = 'message';
 
-    const avatarDiv = document.createElement('div');
-    avatarDiv.className = 'message-avatar';
-    avatarDiv.innerHTML = sender === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+    if (sender === 'user') {
+        // User message structure
+        const userMessageDiv = document.createElement('div');
+        userMessageDiv.className = 'user-message';
+        
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'message-avatar';
+        avatarDiv.innerHTML = '<i class="fas fa-user"></i>';
 
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    
-    // Add image if present
-    if (imageUrl) {
-        const imageDiv = document.createElement('div');
-        imageDiv.className = 'message-image';
-        imageDiv.innerHTML = `<img src="${imageUrl}" alt="Uploaded image" onclick="openImageModal('${imageUrl}')">`;
-        contentDiv.appendChild(imageDiv);
-    }
-    
-    // Add text content
-    if (content) {
-        const textDiv = document.createElement('div');
-        if (sender === 'ai') {
-            textDiv.innerHTML = content; // Server already formatted the content
-        } else {
-            textDiv.textContent = content;
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        // Add image if present
+        if (imageUrl) {
+            const imageDiv = document.createElement('div');
+            imageDiv.className = 'message-image';
+            imageDiv.innerHTML = `<img src="${imageUrl}" alt="Uploaded image" onclick="openImageModal('${imageUrl}')">`;
+            contentDiv.appendChild(imageDiv);
         }
-        contentDiv.appendChild(textDiv);
+        
+        // Add text content
+        if (content) {
+            const textDiv = document.createElement('div');
+            textDiv.textContent = content;
+            contentDiv.appendChild(textDiv);
+        }
+        
+        userMessageDiv.appendChild(avatarDiv);
+        userMessageDiv.appendChild(contentDiv);
+        messageDiv.appendChild(userMessageDiv);
+    } else {
+        // AI message structure (unchanged)
+        messageDiv.className = `message ${sender}-message`;
+        
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'message-avatar';
+        avatarDiv.innerHTML = '<i class="fas fa-robot"></i>';
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        // Add image if present
+        if (imageUrl) {
+            const imageDiv = document.createElement('div');
+            imageDiv.className = 'message-image';
+            imageDiv.innerHTML = `<img src="${imageUrl}" alt="Uploaded image" onclick="openImageModal('${imageUrl}')">`;
+            contentDiv.appendChild(imageDiv);
+        }
+        
+        // Add text content
+        if (content) {
+            const textDiv = document.createElement('div');
+            textDiv.innerHTML = content; // Server already formatted the content
+            contentDiv.appendChild(textDiv);
+        }
+        
+        messageDiv.appendChild(avatarDiv);
+        messageDiv.appendChild(contentDiv);
     }
 
-    messageDiv.appendChild(avatarDiv);
-    messageDiv.appendChild(contentDiv);
     chatMessages.appendChild(messageDiv);
 
     // Handle auto-scroll
@@ -481,31 +633,68 @@ function addMessage(content, sender, imageUrl = null) {
 
 // Add AI message with typewriter effect
 function addMessageWithTypewriter(content, sender, imageUrl = null) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sender}-message`;
-
-    const avatarDiv = document.createElement('div');
-    avatarDiv.className = 'message-avatar';
-    avatarDiv.innerHTML = sender === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
+    let messageDiv, textDiv;
     
-    // Add image if present
-    if (imageUrl) {
-        const imageDiv = document.createElement('div');
-        imageDiv.className = 'message-image';
-        imageDiv.innerHTML = `<img src="${imageUrl}" alt="Uploaded image" onclick="openImageModal('${imageUrl}')">`;
-        contentDiv.appendChild(imageDiv);
+    if (sender === 'user') {
+        // User message structure
+        messageDiv = document.createElement('div');
+        messageDiv.className = 'message';
+        
+        const userMessageDiv = document.createElement('div');
+        userMessageDiv.className = 'user-message';
+        
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'message-avatar';
+        avatarDiv.innerHTML = '<i class="fas fa-user"></i>';
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        // Add image if present
+        if (imageUrl) {
+            const imageDiv = document.createElement('div');
+            imageDiv.className = 'message-image';
+            imageDiv.innerHTML = `<img src="${imageUrl}" alt="Uploaded image" onclick="openImageModal('${imageUrl}')">`;
+            contentDiv.appendChild(imageDiv);
+        }
+        
+        // Create text container for typewriter effect
+        textDiv = document.createElement('div');
+        textDiv.className = 'typewriter-text';
+        contentDiv.appendChild(textDiv);
+        
+        userMessageDiv.appendChild(avatarDiv);
+        userMessageDiv.appendChild(contentDiv);
+        messageDiv.appendChild(userMessageDiv);
+    } else {
+        // AI message structure (unchanged)
+        messageDiv = document.createElement('div');
+        messageDiv.className = `message ${sender}-message`;
+
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'message-avatar';
+        avatarDiv.innerHTML = '<i class="fas fa-robot"></i>';
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        // Add image if present
+        if (imageUrl) {
+            const imageDiv = document.createElement('div');
+            imageDiv.className = 'message-image';
+            imageDiv.innerHTML = `<img src="${imageUrl}" alt="Uploaded image" onclick="openImageModal('${imageUrl}')">`;
+            contentDiv.appendChild(imageDiv);
+        }
+        
+        // Create text container for typewriter effect
+        textDiv = document.createElement('div');
+        textDiv.className = 'typewriter-text';
+        contentDiv.appendChild(textDiv);
+        
+        messageDiv.appendChild(avatarDiv);
+        messageDiv.appendChild(contentDiv);
     }
-    
-    // Create text container for typewriter effect
-    const textDiv = document.createElement('div');
-    textDiv.className = 'typewriter-text';
-    contentDiv.appendChild(textDiv);
 
-    messageDiv.appendChild(avatarDiv);
-    messageDiv.appendChild(contentDiv);
     chatMessages.appendChild(messageDiv);
 
     // Start typewriter effect
@@ -708,6 +897,8 @@ function escapeHtml(text) {
 // Handle AI response
 function handleAIResponse(data) {
     console.log('Received AI response:', data);
+    
+    // Hiển thị AI response với typewriter effect
     addMessageWithTypewriter(data.response, 'ai');
     
     // Save AI response to conversation
@@ -728,31 +919,10 @@ function handleAIResponse(data) {
     }
 }
 
-// Handle typing indicator
-function handleTyping(typing) {
-    console.log('Typing indicator:', typing);
-    isTyping = typing;
-    typingIndicator.style.display = typing ? 'block' : 'none';
-    
-    if (typing) {
-        // Auto scroll when typing starts (if user is near bottom)
-        if (isUserAtBottom()) {
-            scrollToBottom(true);
-        }
-    } else {
-        // Re-enable input
-        messageInput.disabled = false;
-        messageInput.focus();
-    }
-}
-
 // Handle errors
 function handleError(error) {
     console.error('Received error:', error);
     addMessage('Xin lỗi, đã có lỗi xảy ra: ' + error, 'ai');
-    isTyping = false;
-    messageInput.disabled = false;
-    messageInput.focus();
 }
 
 // Scroll to bottom of chat
@@ -812,25 +982,33 @@ function showWelcomeScreen() {
     currentConversationId = null;
     localStorage.removeItem('currentConversationId');
     
-    chatMessages.innerHTML = `
-        <div class="welcome-message">
-            <div class="logo">
-                <span style="font-size: 48px;">🧠</span>
-            </div>
-            <h2>Chào mừng đến với <span class="brand-name">HieuBiet.Net</span></h2>
-            <p>Trợ lý AI thông minh giúp bạn trả lời câu hỏi, viết code, phân tích ảnh và nhiều thứ khác!</p>
-            <p><strong>✨ Đặc biệt: Tôi sẽ tự động phát hiện ngôn ngữ bạn sử dụng và trả lời bằng chính ngôn ngữ đó!</strong></p>
-            <div class="example-questions">
-                <h3>Ví dụ câu hỏi:</h3>
-                <ul>
-                    <li>🇻🇳 "Trí tuệ nhân tạo là gì?" → Trả lời bằng tiếng Việt</li>
-                    <li>🇺🇸 "What is artificial intelligence?" → Answer in English</li>
-                    <li>📸 Upload ảnh + "Describe this image" → Mô tả bằng tiếng Anh</li>
-                    <li>💻 "Write a Python function" → Code và giải thích bằng tiếng Anh</li>
-                </ul>
-            </div>
+    // Xóa toàn bộ nội dung chatMessages (trừ indicator)
+    Array.from(chatMessages.children).forEach(child => {
+        if (!child.classList.contains('typing-indicator')) {
+            chatMessages.removeChild(child);
+        }
+    });
+    // Tạo lại welcome-message
+    const div = document.createElement('div');
+    div.className = 'welcome-message';
+    div.innerHTML = `
+        <h2>Chào mừng đến với <span class="brand-name">HieuBiet.Net</span></h2>
+        <p>Trợ lý AI thông minh giúp bạn trả lời câu hỏi, viết code, phân tích ảnh và nhiều thứ khác!</p>
+        <p><strong>✨ Đặc biệt: Tôi sẽ tự động phát hiện ngôn ngữ bạn sử dụng và trả lời bằng chính ngôn ngữ đó!</strong></p>
+        <div class="example-questions">
+            <h3>Ví dụ câu hỏi:</h3>
+            <ul>
+                <li>🇻🇳 "Trí tuệ nhân tạo là gì?" → Trả lời bằng tiếng Việt</li>
+                <li>🇺🇸 "What is artificial intelligence?" → Answer in English</li>
+                <li>📸 Upload ảnh + "Describe this image" → Mô tả bằng tiếng Anh</li>
+                <li>💻 "Write a Python function" → Code và giải thích bằng tiếng Anh</li>
+            </ul>
         </div>
     `;
+    chatMessages.insertBefore(div, chatMessages.querySelector('.typing-indicator'));
+    // Luôn đảm bảo indicator nằm cuối
+    let indicator = document.getElementById('typingIndicator');
+    if (indicator) chatMessages.appendChild(indicator);
     messageInput.focus();
     
     // Update active chat in sidebar (none should be active)

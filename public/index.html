@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>HieuBiet.Net - AI Assistant</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=202507212">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
@@ -41,15 +44,12 @@
                 <button class="sidebar-toggle" onclick="toggleSidebar()">
                     <i class="fas fa-bars"></i>
                 </button>
-                <h1><span class="brand-name">HieuBiet.Net</span></h1>
+                <h1><span class="brand-name">HIEUBIET.NET</span></h1>
             </div>
 
             <div class="chat-container">
                 <div class="chat-messages" id="chatMessages">
                     <div class="welcome-message">
-                        <div class="logo">
-                            <span style="font-size: 48px;">🧠</span>
-                        </div>
                         <h2>Chào mừng đến với <span class="brand-name">HieuBiet.Net</span></h2>
                         <p>Trợ lý AI thông minh giúp bạn trả lời câu hỏi, viết code, phân tích ảnh và nhiều thứ khác!</p>
                         <p><strong>✨ Đặc biệt: Tôi sẽ tự động phát hiện ngôn ngữ bạn sử dụng và trả lời bằng chính ngôn ngữ đó!</strong></p>
@@ -63,6 +63,22 @@
                             </ul>
                         </div>
                     </div>
+                    
+                    <!-- Typing Indicator -->
+                    <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                        <div class="message ai-message">
+                            <div class="message-avatar">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="message-content">
+                                <div class="typing-dots">
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Scroll to bottom button -->
@@ -70,22 +86,6 @@
                     <i class="fas fa-arrow-down"></i>
                     <span>Tin nhắn mới</span>
                 </button>
-                
-                <!-- Typing indicator -->
-                <div class="typing-indicator" id="typingIndicator" style="display: none;">
-                    <div class="message ai-message">
-                        <div class="message-avatar">
-                            <i class="fas fa-robot"></i>
-                        </div>
-                        <div class="message-content">
-                            <div class="typing-dots">
-                                <span></span>
-                                <span></span>
-                                <span></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <div class="chat-input-container">
@@ -122,7 +122,7 @@
                     </button>
                 </div>
                 <div class="input-footer">
-                    <small>� AI tự động phát hiện ngôn ngữ và trả lời tương ứng • Hỗ trợ ảnh JPG, PNG, GIF, WebP • Hãy kiểm tra thông tin quan trọng</small>
+                    <small>• Hãy kiểm tra thông tin quan trọng</small>
                 </div>
             </div>
         </div>
@@ -130,6 +130,6 @@
 
     <!-- Scripts -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="script.js"></script>
+    <script src="script.js?v=202507212"></script>
 </body>
 </html>
