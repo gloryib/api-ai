@@ -1,5 +1,15 @@
 # HieuBiet.Net - AI Assistant
 
+🧠 **Trợ lý AI thông minh** giống ChatGPT với khả năng tự động phát hiện ngôn ngữ và trả lời tương ứng!
+
+## ✨ Tính năng
+
+- 🌐 **Đa ngôn ngữ**: Tự động phát hiện và trả lời bằng ngôn ngữ người dùng sử dụng
+- 📸 **Upload ảnh**: Hỗ trợ phân tích và mô tả hình ảnh (JPG, PNG, GIF, WebP)
+- 💬 **Real-time chat**: Socket.IO cho trải nghiệm chat mượt mà
+- 📱 **Responsive design**: Tương thích mobile và desktop
+- 💾 **Lịch sử chat**: Tự động lưu và quản lý cuộc hội thoại.Net - AI Assistant
+
 Một ứng dụng web AI thông minh được xây dựng bằng Node.js, tích hợp Gemini API và OpenAI API, đặc biệt tối ưu cho tiếng Việt.
 
 ## Tính năng
