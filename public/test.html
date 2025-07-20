@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Chat</title>
+</head>
+<body>
+    <div>
+        <input type="text" id="messageInput" placeholder="Type message...">
+        <button id="sendButton">Send</button>
+    </div>
+    <div id="messages"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        console.log('Loading test page...');
+        
+        // Test DOM elements
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const messages = document.getElementById('messages');
+        
+        console.log('messageInput:', messageInput);
+        console.log('sendButton:', sendButton);
+        
+        if (!messageInput || !sendButton) {
+            console.error('DOM elements not found!');
+        } else {
+            console.log('DOM elements found ✅');
+        }
+        
+        // Test Socket.IO
+        const socket = io();
+        
+        socket.on('connect', () => {
+            console.log('✅ Socket connected:', socket.id);
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('❌ Socket disconnected');
+        });
+        
+        socket.on('connect_error', (error) => {
+            console.error('❌ Socket connection error:', error);
+        });
+        
+        // Send function
+        function sendMessage() {
+            console.log('sendMessage called');
+            const message = messageInput.value.trim();
+            if (!message) return;
+            
+            console.log('Sending:', message);
+            messages.innerHTML += `<div>User: ${message}</div>`;
+            
+            socket.emit('chat message', {
+                message: message,
+                conversationId: 'test'
+            });
+            
+            messageInput.value = '';
+        }
+        
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // Socket response
+        socket.on('chat response', (data) => {
+            console.log('AI response:', data);
+            messages.innerHTML += `<div>AI: ${data.response}</div>`;
+        });
+        
+        console.log('Test page loaded ✅');
+    </script>
+</body>
+</html>

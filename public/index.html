@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HieuBiet.Net - AI Assistant</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <button class="new-chat-btn" onclick="startNewChat()">
+                    <i class="fas fa-plus"></i>
+                    <span>Cuộc trò chuyện mới</span>
+                </button>
+            </div>
+            <div class="chat-history">
+                <div class="chat-history-header">
+                    <h3>Lịch sử chat</h3>
+                    <div class="chat-history-controls">
+                        <button class="cleanup-btn" onclick="cleanupInvalidConversations()" title="Dọn dẹp cuộc trò chuyện lỗi">
+                            <i class="fas fa-broom"></i>
+                        </button>
+                        <button class="clear-history-btn" onclick="clearAllHistory()" title="Xóa tất cả lịch sử">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="chat-history-list">
+                    <!-- Chat history items will be added here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="main-content">
+            <div class="chat-header">
+                <button class="sidebar-toggle" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1><span class="brand-name">HieuBiet.Net</span></h1>
+            </div>
+
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="welcome-message">
+                        <div class="logo">
+                            <span style="font-size: 48px;">🧠</span>
+                        </div>
+                        <h2>Chào mừng đến với <span class="brand-name">HieuBiet.Net</span></h2>
+                        <p>Trợ lý AI thông minh giúp bạn trả lời câu hỏi, viết code, phân tích ảnh và nhiều thứ khác!</p>
+                        <p><strong>✨ Đặc biệt: Tôi sẽ tự động phát hiện ngôn ngữ bạn sử dụng và trả lời bằng chính ngôn ngữ đó!</strong></p>
+                        <div class="example-questions">
+                            <h3>Ví dụ câu hỏi:</h3>
+                            <ul>
+                                <li>🇻🇳 "Trí tuệ nhân tạo là gì?" → Trả lời bằng tiếng Việt</li>
+                                <li>🇺🇸 "What is artificial intelligence?" → Answer in English</li>
+                                <li>📸 Upload ảnh + "Describe this image" → Mô tả bằng tiếng Anh</li>
+                                <li>💻 "Write a Python function" → Code và giải thích bằng tiếng Anh</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Scroll to bottom button -->
+                <button class="scroll-to-bottom-btn" id="scrollToBottomBtn" onclick="scrollToBottom()" style="display: none;">
+                    <i class="fas fa-arrow-down"></i>
+                    <span>Tin nhắn mới</span>
+                </button>
+                
+                <!-- Typing indicator -->
+                <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                    <div class="message ai-message">
+                        <div class="message-avatar">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="message-content">
+                            <div class="typing-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-input-container">
+                <div class="image-preview" id="imagePreview" style="display: none;">
+                    <div class="preview-content">
+                        <img id="previewImage" src="" alt="Preview">
+                        <button class="remove-image-btn" onclick="removeImage()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="chat-input-wrapper">
+                    <div class="input-controls">
+                        <button class="attachment-btn" onclick="document.getElementById('imageInput').click()">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        <input 
+                            type="file" 
+                            id="imageInput" 
+                            accept="image/*" 
+                            style="display: none;"
+                            onchange="handleImageSelect(this)"
+                        >
+                    </div>
+                    <textarea 
+                        id="messageInput" 
+                        placeholder="Hỏi gì cũng được bằng bất kỳ ngôn ngữ nào..."
+                        rows="1"
+                        maxlength="2000"
+                    ></textarea>
+                    <button id="sendButton">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="input-footer">
+                    <small>� AI tự động phát hiện ngôn ngữ và trả lời tương ứng • Hỗ trợ ảnh JPG, PNG, GIF, WebP • Hãy kiểm tra thông tin quan trọng</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
