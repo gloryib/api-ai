@@ -19,13 +19,18 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "body-parser": "^1.20.2",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "csurf": "^1.11.0",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-rate-limit": "^8.0.1",
+    "file-type": "^21.0.0",
     "fs-extra": "^11.3.0",
     "multer": "^2.0.2",
     "openai": "^4.20.1",
-    "socket.io": "^4.7.4"
+    "socket.io": "^4.7.4",
+    "xss": "^1.0.15"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

@@ -8,7 +8,12 @@
     <meta http-equiv="Expires" content="0">
     <title>HieuBiet.Net - AI Assistant</title>
     <link rel="stylesheet" href="style.css?v=202507212">
+    <link rel="manifest" href="/manifest.json">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Thư viện chuyển đổi HEIC và nén ảnh -->
+    <script src="https://unpkg.com/heic2any/dist/heic2any.min.js"></script>
+    <script src="https://unpkg.com/browser-image-compression/dist/browser-image-compression.min.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -131,5 +136,14 @@
     <!-- Scripts -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="script.js?v=202507212"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(function(reg) { console.log('Service Worker registered:', reg); })
+            .catch(function(err) { console.warn('Service Worker registration failed:', err); });
+        });
+      }
+    </script>
 </body>
 </html>

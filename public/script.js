@@ -279,41 +279,79 @@ function loadConversationsFromStorage() {
 
 // Handle image selection
 async function handleImageSelect(input) {
-    const file = input.files[0];
+    let file = input.files[0];
     if (!file) return;
-    
+    // Nếu là HEIC thì chuyển sang JPEG
+    if (file.type === 'image/heic' || file.name.endsWith('.heic')) {
+        try {
+            if (window.heic2any) {
+                const convertedBlob = await window.heic2any({ blob: file, toType: 'image/jpeg', quality: 0.5 });
+                file = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
+            }
+        } catch (err) {
+            alert('Không thể chuyển đổi ảnh HEIC. Vui lòng chọn ảnh khác!');
+            return;
+        }
+    }
     // Validate file type
     if (!file.type.startsWith('image/')) {
         alert('Vui lòng chọn file ảnh!');
         return;
     }
-    
-    // Validate file size (10MB)
-    if (file.size > 10 * 1024 * 1024) {
-        alert('File ảnh quá lớn! Vui lòng chọn file nhỏ hơn 10MB.');
+    // Luôn nén lại ảnh trước khi upload (kể cả JPG/JPEG/PNG/GIF/WEBP)
+    const options = {
+        maxSizeMB: 0.3,
+        maxWidthOrHeight: 600,
+        useWebWorker: true,
+        quality: 0.5 // giảm chất lượng JPG mạnh hơn
+    };
+    let compressedFile = file;
+    try {
+        // Nén ảnh trước
+        if (window.imageCompression) {
+            compressedFile = await window.imageCompression(file, options);
+        }
+        // Luôn ép resize về maxWidthOrHeight bằng canvas
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(compressedFile);
+        await new Promise((resolve) => { img.onload = resolve; });
+        if (img.width > options.maxWidthOrHeight || img.height > options.maxWidthOrHeight) {
+            const scale = options.maxWidthOrHeight / Math.max(img.width, img.height);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const quality = options.quality || 0.5;
+            const mimeType = compressedFile.type || 'image/jpeg';
+            const blob = await new Promise((resolve) => canvas.toBlob(resolve, mimeType, quality));
+            if (blob) {
+                compressedFile = new File([blob], compressedFile.name, { type: mimeType });
+            }
+        }
+    } catch (err) {
+        console.warn('Không thể nén/resize ảnh, dùng file gốc:', err);
+    }
+    // Chỉ kiểm tra kích thước file sau khi đã nén xong
+    if (compressedFile.size > 10 * 1024 * 1024) {
+        alert('File ảnh quá lớn sau khi nén! Vui lòng chọn file nhỏ hơn 10MB.');
         return;
     }
-    
     try {
         // Upload image
         const formData = new FormData();
-        formData.append('image', file);
-        
+        formData.append('image', compressedFile);
         const response = await fetch('/api/upload', {
             method: 'POST',
             body: formData
         });
-        
         const result = await response.json();
-        
         if (result.success) {
-            currentImageFile = file;
+            currentImageFile = compressedFile;
             currentImageUrl = result.file.url;
-            
             // Show preview
             previewImage.src = currentImageUrl;
             imagePreview.style.display = 'block';
-            
             // Focus on input
             messageInput.focus();
             messageInput.placeholder = 'Mô tả ảnh này hoặc đặt câu hỏi bằng bất kỳ ngôn ngữ nào...';
@@ -900,7 +938,7 @@ function handleAIResponse(data) {
     
     // Hiển thị AI response với typewriter effect
     addMessageWithTypewriter(data.response, 'ai');
-    
+
     // Save AI response to conversation
     if (conversations.has(currentConversationId)) {
         const conversation = conversations.get(currentConversationId);
@@ -909,14 +947,17 @@ function handleAIResponse(data) {
             sender: 'ai',
             timestamp: Date.now()
         });
-        
-        // Update lastMessageTime
         conversation.lastMessageTime = Date.now();
         conversations.set(currentConversationId, conversation);
-        
-        // Save to localStorage
         saveConversationsToStorage();
     }
+
+    // Kích hoạt lại input và nút gửi
+    messageInput.disabled = false;
+    sendButton.disabled = false;
+    messageInput.placeholder = 'Hỏi gì cũng được bằng bất kỳ ngôn ngữ nào...';
+    sendButton.innerHTML = '<i class="fas fa-paper-plane"></i>';
+    messageInput.focus();
 }
 
 // Handle errors

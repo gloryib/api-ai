@@ -1,5 +1,17 @@
 const express = require('express');
+const xss = require('xss');
+const rateLimit = require('express-rate-limit');
+// Dynamic import fileTypeFromBuffer cho CommonJS
+let fileTypeFromBuffer;
+async function getFileTypeFromBuffer(buffer) {
+  if (!fileTypeFromBuffer) {
+    const ft = await import('file-type');
+    fileTypeFromBuffer = ft.fileTypeFromBuffer;
+  }
+  return fileTypeFromBuffer(buffer);
+}
 const cors = require('cors');
+const csurf = require('csurf');
 const bodyParser = require('body-parser');
 const multer = require('multer');
 const fs = require('fs-extra');
@@ -29,13 +41,60 @@ const io = socketIo(server, {
 
 const PORT = process.env.PORT || 3000;
 
+// Middleware chặn request bất thường
+app.use((req, res, next) => {
+  const userAgent = req.headers['user-agent'] || '';
+  const ip = req.ip || req.connection.remoteAddress || '';
+  // Chặn User-Agent rỗng hoặc chứa từ khóa bot, curl, python, http
+  const suspicious = !userAgent || /(bot|curl|python|http|wget|scrapy|spider)/i.test(userAgent);
+  // Có thể thêm blacklist IP tại đây nếu muốn
+  if (suspicious) {
+    console.warn(`Blocked suspicious request from IP: ${ip}, UA: ${userAgent}`);
+    return res.status(403).json({ error: 'Request bị chặn vì nghi ngờ tự động hoặc bot.' });
+  }
+  next();
+});
+
+// Rate limit: tối đa 10 request mỗi phút cho mỗi IP
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 phút
+  max: 10, // tối đa 10 request
+  message: {
+    error: 'Bạn gửi quá nhiều tin nhắn, vui lòng thử lại sau!'
+  }
+});
+
+// Rate limit upload: tối đa 5 lần upload mỗi phút cho mỗi IP
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: {
+    error: 'Bạn upload quá nhiều file, vui lòng thử lại sau!'
+  }
+});
+
 // Trust proxy for Cloudflare/reverse proxies
 app.set('trust proxy', 1);
 
 // Middleware
-app.use(cors());
+// Thiết lập CORS chỉ cho phép từ origin hợp lệ (ví dụ: http://localhost:3000 hoặc domain của bạn)
+app.use(cors({
+  origin: ["http://localhost:3000", "https://hieubiet.net"],
+  credentials: true
+}));
 app.use(bodyParser.json());
+// CSRF protection cho các request POST/quan trọng
+const csrfProtection = csurf({ cookie: true });
+const cookieParser = require('cookie-parser');
+app.use(cookieParser());
 app.use(express.static('public'));
+// Áp dụng rate limit cho endpoint upload
+app.use('/api/upload', uploadLimiter);
+app.use('/api/upload', csrfProtection);
+
+// Áp dụng rate limit cho endpoint chat
+app.use('/api/chat', chatLimiter);
+app.use('/api/chat', csrfProtection);
 
 // Create uploads directory
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -58,9 +117,10 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: (req, file, cb) => {
-    // Accept images only
-    if (!file.mimetype.startsWith('image/')) {
-      return cb(new Error('Chỉ chấp nhận file ảnh!'), false);
+    // Chỉ cho phép jpg, jpeg, png, gif, webp
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      return cb(new Error('Chỉ chấp nhận file ảnh JPG, PNG, GIF, WEBP!'), false);
     }
     cb(null, true);
   }
@@ -159,9 +219,9 @@ code
     
     const messagesWithSystem = [systemMessage, ...messages];
     
-    // OpenAI doesn't support images in GPT-3.5-turbo, would need GPT-4-vision
+    // OpenAI doesn't support images in GPT-4o, would need GPT-4-vision
     const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4o',
       messages: messagesWithSystem,
       max_tokens: 1000,
       temperature: 0.7,
@@ -214,6 +274,11 @@ function formatAIResponse(content) {
 </button>
 </div>`;
   });
+  // Tự động xuống dòng cho các danh sách số (1., 2., ...), nhưng KHÔNG thay đổi <ul>, <ol>, <li>
+  // Nếu đã có <ul> hoặc <ol> thì giữ nguyên, chỉ xử lý text thường
+  if (!/<ul>|<ol>/i.test(formatted)) {
+    formatted = formatted.replace(/(\d+\.)(?=\s)/g, '<br>$1');
+  }
 
   // Check if we need paragraphs BEFORE applying paragraph formatting
   const needsParagraphs = /\n\s*\n/.test(formatted.replace(/<div class="code-block-wrapper">[\s\S]*?<\/div>/g, ''));
@@ -286,22 +351,50 @@ app.get('/', (req, res) => {
 });
 
 // Upload image route
-app.post('/api/upload', upload.single('image'), (req, res) => {
+app.post('/api/upload', upload.single('image'), csrfProtection, (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Không có file được tải lên' });
     }
-    
-    const fileInfo = {
-      filename: req.file.filename,
-      originalname: req.file.originalname,
-      path: req.file.path,
-      size: req.file.size,
-      url: `/uploads/${req.file.filename}`
-    };
-    
-    console.log('File uploaded:', fileInfo);
-    res.json({ success: true, file: fileInfo });
+    // Kiểm tra nội dung file thực sự là ảnh
+    fs.readFile(req.file.path)
+      .then(async buffer => {
+        try {
+          const type = await getFileTypeFromBuffer(buffer);
+          if (!type) {
+            console.warn('Cảnh báo: file-type không nhận diện được file', req.file.originalname);
+            // Vẫn cho phép upload nếu MIME type hợp lệ
+          } else if (!['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(type.ext)) {
+            // Xóa file giả mạo
+            await fs.unlink(req.file.path);
+            return res.status(400).json({ error: 'File upload không phải là ảnh hợp lệ!' });
+          }
+          const fileInfo = {
+            filename: req.file.filename,
+            originalname: req.file.originalname,
+            path: req.file.path,
+            size: req.file.size,
+            url: `/uploads/${req.file.filename}`
+          };
+          console.log('File uploaded:', fileInfo);
+          res.json({ success: true, file: fileInfo });
+        } catch (err) {
+          console.warn('Cảnh báo: file-type lỗi khi kiểm tra file', req.file.originalname, err);
+          // Vẫn cho phép upload nếu MIME type hợp lệ
+          const fileInfo = {
+            filename: req.file.filename,
+            originalname: req.file.originalname,
+            path: req.file.path,
+            size: req.file.size,
+            url: `/uploads/${req.file.filename}`
+          };
+          res.json({ success: true, file: fileInfo });
+        }
+      })
+      .catch(error => {
+        console.error('Upload error:', error);
+        res.status(500).json({ error: 'Lỗi khi tải file lên' });
+      });
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ error: 'Lỗi khi tải file lên' });
@@ -311,23 +404,26 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
 // Serve uploaded files
 app.use('/uploads', express.static(uploadsDir));
 
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', csrfProtection, async (req, res) => {
+// Endpoint để lấy CSRF token cho frontend
+app.get('/api/csrf-token', csrfProtection, (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
   try {
-    const { message, conversationId } = req.body;
-    
+    let { message, conversationId } = req.body;
+    // Lọc nội dung đầu vào chống XSS
+    message = xss(message);
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
     }
-
     // Get or create conversation history
     let conversation = conversations.get(conversationId) || [];
-    
-    // Add user message to conversation
+    // Add user message đã lọc vào conversation
     conversation.push({ role: 'user', content: message });
     
     // Call OpenAI API
     const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4o',
       messages: conversation,
       max_tokens: 1000,
       temperature: 0.7,
